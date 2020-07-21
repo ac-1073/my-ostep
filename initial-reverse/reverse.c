@@ -81,7 +81,8 @@ int main (int argc, char** argv)
         size_t len = 0;
         __ssize_t read;
 
-        switch (argc)   {
+        switch (argc)
+        {
                 case 1: input = stdin;
                         output = stdout;
                         break;
@@ -90,9 +91,9 @@ int main (int argc, char** argv)
                         output = stdout;
                         break;
 
-                case 3: open_File(&input, argv[1], "r");
+                case 3: check_Filenames(argv[1], argv[2]);
+                        open_File(&input, argv[1], "r");
                         open_File(&output, argv[2], "w");
-                        check_Filenames(argv[1], argv[2]);
                         check_Filesizes(input, output);
                         break;
                         

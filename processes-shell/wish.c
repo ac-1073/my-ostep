@@ -6,18 +6,32 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define MAX_CMD 20 /*maximum commands to be run in shell*/
-#define MAX_ARG 20 /*maximum arguments applied to a command*/
+#define MAX_LEN 120 // Buffer size for all arrays and strings
 
 char error_message[30] = "An error has occurred\n";
+
+int wish_path (char* args, char paths[]){
+        if (args != NULL){
+                memset(paths, 0, MAX_LEN);
+                strncpy(paths, args, strlen(args));
+        } else {
+                write(STDERR_FILENO, error_message, strlen(error_message));
+        }
+        return 1;
+}
+
+int wish_cd (char* args, char paths[]){
+
+        if (args == NULL) {
+                write(STDERR_FILENO, error_message, strlen(error_message));
+        }
+        chdir("..");
+        return 1;
+}
 
 /* Removes leading & trailing whitespace from strings */
 char* clear_Whitespace (char* line)
 {
-        /* For error handling w/strsep */
-        if (line == NULL)
-                return NULL;
-
         char* end;
 
         /* Advance pointer through whitespace */
@@ -53,19 +67,31 @@ char* clear_Whitespace (char* line)
 */
 char** tokenize (char* input, const char* delim)
 {
-        char** new = malloc(sizeof(char*) * MAX_CMD);
-        char *tok, *end = input;
+        char** new = malloc(sizeof(char*) * MAX_LEN);
         int i = 0;
 
-        while ((tok = strsep(&end, delim)) != NULL) {
-                /* TODO: realloc if commands exceed current size */
-                new[i] = tok;
-                end = clear_Whitespace(end);
-                i++;
+        if (new == NULL) {
+                write(STDERR_FILENO, error_message, strlen(error_message));
         }
-        /* Set first unused index to NULL */
-        new[i] = NULL;
+        else {
+                char *tok, *end = input;
 
+                while ((tok = strsep(&end, delim)) != NULL) {
+                        if(*clear_Whitespace(tok) != 0){
+                                new[i] = clear_Whitespace(tok);
+                                i++;
+                        }
+                }
+                /* Set first unused index to NULL */
+                new[i] = NULL;
+        }
+
+        /* free and return NULL if no valid input */
+        if (new[0] == NULL){ 
+                free(new);
+                return NULL;
+        }
+       
         return new;
 }
 
@@ -73,17 +99,44 @@ char** tokenize (char* input, const char* delim)
  * Evaluate user input and run built-in commands
  * or processes as specified.
 */
-int eval (char* line)
+int eval (char* line, char path[])
 {
         char** cmds;
-        line = clear_Whitespace(line);
         cmds = tokenize(line, "&");
-        /* TODO */
-        
+
+        // Return if malloc fail or no valid commands
+        if (cmds == NULL){
+                return 1;
+        }
+
+        /* Run built in commands */
+        if (cmds[1] == NULL){
+
+                char* cmd_func = cmds[0];
+                char* cmd_args = cmds[0];
+                free(cmds);
+                cmd_func = strsep(&cmd_args, " \t\n");
+
+                if (strncmp(cmd_func, "exit", sizeof(char) * 4) == 0)
+                        return 0;
+
+                if (strncmp(cmd_func, "path", sizeof(char) * 4) == 0)
+                        return wish_path(cmd_args, path);
+
+                if (strncmp(cmd_func, "cd", sizeof(char) * 2) == 0)
+                        return wish_path(cmd_args, path);
+        } else {
+                /* TODO */
+                //run_procs(cmds);
+        }
+
+        return 1;
 }
+
 
 /* TODO: finish */
 /* runs processes for n commands */
+/*
 void run_procs (char* line)
 {
        pid_t pids;
@@ -110,24 +163,22 @@ void run_procs (char* line)
                printf("Child with PID %ld exited with status 0x%x.\n", (long)pid, status);
                n--;
        }
-}
+}*/
 
 
 int main (int argc, char** argv)
 {
-        char* line = NULL; // User input
+        char path[MAX_LEN];  // Shell search path. Set to '/bin' on startup.
+        strncpy(path, "/bin", 5);
+
+        char* line = NULL;
         size_t len = 0;
         __ssize_t read;
-        char** path = NULL; // Search path(s) of shell
 
         printf("wish> ");
+        while ((read = getline(&line, &len, stdin)) != -1 && eval(line, path) == 1)
+                printf("wish> ");
 
-        while ((read = getline(&line, &len, stdin)) != -1) {
-               
-               /* 
-                * TODO
-               */
-               printf("wish> ");
-        }
+        free(line);
         exit(0);
 }
